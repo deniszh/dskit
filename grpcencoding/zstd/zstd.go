@@ -18,7 +18,6 @@ package zstd
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"runtime"
 	"sync"
@@ -33,6 +32,7 @@ var encoderOptions = []zstd.EOption{
 	// The default zstd window size is 8MB, which is much larger than the
 	// typical RPC message and wastes a bunch of memory.
 	zstd.WithWindowSize(512 * 1024),
+	zstd.WithEncoderLevel(zstd.SpeedDefault),
 }
 
 var decoderOptions = []zstd.DOption{
@@ -53,33 +53,16 @@ type compressor struct {
 	decoderPool sync.Pool // To hold *zstd.Decoder's.
 }
 
+func init() {
+	encoding.RegisterCompressor(newCompressor())
+}
+
 func newCompressor() *compressor {
 	enc, _ := zstd.NewWriter(nil, encoderOptions...)
 	c := &compressor{
 		encoder: enc,
 	}
-	encoding.RegisterCompressor(c)
 	return c
-}
-
-var ErrNotInUse = errors.New("SetLevel ineffective because another zstd compressor has been registered")
-
-// SetLevel updates the registered compressor to use a particular compression
-// level. NOTE: this function must only be called from an init function, and
-// is not threadsafe.
-func SetLevel(level zstd.EncoderLevel) error {
-	c, ok := encoding.GetCompressor(Name).(*compressor)
-	if !ok {
-		return ErrNotInUse
-	}
-
-	enc, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(level))
-	if err != nil {
-		return err
-	}
-
-	c.encoder = enc
-	return nil
 }
 
 func (c *compressor) Compress(w io.Writer) (io.WriteCloser, error) {
