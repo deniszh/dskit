@@ -41,13 +41,16 @@ type reader struct {
 	pool *sync.Pool
 }
 
+func init() {
+	encoding.RegisterCompressor(newCompressor())
+}
+
 func newCompressor() *compressor {
 	c := &compressor{}
 	c.poolCompressor.New = func() interface{} {
 		w := s2.NewWriter(io.Discard, s2.WriterConcurrency(1))
 		return &writer{Writer: w, pool: &c.poolCompressor}
 	}
-	encoding.RegisterCompressor(c)
 	return c
 }
 
