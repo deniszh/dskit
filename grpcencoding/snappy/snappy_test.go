@@ -2,6 +2,7 @@ package snappy
 
 import (
 	"bytes"
+	"google.golang.org/grpc/encoding"
 	"io"
 	"strings"
 	"testing"
@@ -66,5 +67,27 @@ func BenchmarkSnappyDecompress(b *testing.B) {
 		r, _ := c.Decompress(reader)
 		_, _ = io.ReadAll(r)
 		_, _ = reader.Seek(0, io.SeekStart)
+	}
+}
+
+func BenchmarkSnappyGrpcCompressionPerf(b *testing.B) {
+	data := []byte(strings.Repeat("123456789", 1024))
+	grpcc := encoding.GetCompressor(Name)
+
+	// Reset the timer to exclude setup time from the measurements
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 10; j++ {
+			var buf bytes.Buffer
+			writer, _ := grpcc.Compress(&buf)
+			_, _ = writer.Write(data)
+			_ = writer.Close()
+
+			compressedData := buf.Bytes()
+			reader, _ := grpcc.Decompress(bytes.NewReader(compressedData))
+			var result bytes.Buffer
+			_, _ = result.ReadFrom(reader)
+		}
 	}
 }
